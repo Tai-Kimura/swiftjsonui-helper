@@ -187,6 +187,133 @@ const templates = {
 	}
 };
 
+/**
+ * Collects all sibling IDs from the same hierarchy level
+ * @param text The full document text
+ * @param currentPos The current cursor position in the document
+ * @returns Array of IDs from sibling components
+ */
+function collectSiblingIds(text: string, currentPos: number): string[] {
+	const ids: string[] = [];
+	
+	console.log('[collectSiblingIds] Starting search from position:', currentPos);
+	
+	try {
+		// Parse the JSON to get a proper structure
+		// First, find the current line and the property we're editing
+		const lines = text.split('\n');
+		let currentLineIndex = 0;
+		let charCount = 0;
+		
+		for (let i = 0; i < lines.length; i++) {
+			if (charCount + lines[i].length >= currentPos) {
+				currentLineIndex = i;
+				break;
+			}
+			charCount += lines[i].length + 1; // +1 for newline
+		}
+		
+		console.log('[collectSiblingIds] Current line:', currentLineIndex, lines[currentLineIndex]);
+		
+		// Try to parse the JSON document
+		try {
+			// Try to find where we are in the JSON structure
+			let parentArrayStart = -1;
+			
+			// Walk backwards from current position to find parent child array
+			for (let i = currentPos - 1; i >= 0; i--) {
+				const char = text[i];
+				
+				// Simple check for "child" property
+				if (i >= 5) {
+					const substr = text.substring(i - 5, i + 1);
+					if (substr === '"child"') {
+						// Look for the array start after this
+						let j = i + 1;
+						while (j < text.length && /\s|:/.test(text[j])) {
+							j++;
+						}
+						if (text[j] === '[') {
+							// Check if current position is inside this array
+							let testDepth = 0;
+							for (let k = j; k < currentPos && k < text.length; k++) {
+								if (text[k] === '[') testDepth++;
+								else if (text[k] === ']') {
+									testDepth--;
+									if (testDepth === 0) {
+										// We're not inside this array
+										break;
+									}
+								}
+							}
+							if (testDepth > 0) {
+								// We're inside this child array
+								parentArrayStart = j;
+								console.log('[collectSiblingIds] Found parent child array at:', parentArrayStart);
+								
+								// Extract all IDs from this child array
+								let arrayEnd = j + 1;
+								let arrayDepth = 1;
+								
+								// Find the end of this array
+								while (arrayEnd < text.length && arrayDepth > 0) {
+									if (text[arrayEnd] === '[') arrayDepth++;
+									else if (text[arrayEnd] === ']') arrayDepth--;
+									arrayEnd++;
+								}
+								
+								const arrayContent = text.substring(j, arrayEnd);
+								console.log('[collectSiblingIds] Array content length:', arrayContent.length);
+								
+								// Extract all "id" values from this array
+								// Use a simple regex to find all id properties
+								const idRegex = /"id"\s*:\s*"([^"]+)"/g;
+								let match;
+								while ((match = idRegex.exec(arrayContent)) !== null) {
+									ids.push(match[1]);
+									console.log('[collectSiblingIds] Found ID:', match[1]);
+								}
+								
+								break;
+							}
+						}
+					}
+				}
+			}
+			
+			// If no parent child array found, we might be at root level
+			if (parentArrayStart === -1) {
+				console.log('[collectSiblingIds] No parent child array found, looking at root level');
+				// Just extract all IDs from the document for now
+				const idRegex = /"id"\s*:\s*"([^"]+)"/g;
+				let match;
+				while ((match = idRegex.exec(text)) !== null) {
+					if (!ids.includes(match[1])) {
+						ids.push(match[1]);
+					}
+				}
+			}
+			
+		} catch (parseError) {
+			console.log('[collectSiblingIds] Could not parse JSON, using fallback method');
+			// Fallback: just find all IDs in the document
+			const idRegex = /"id"\s*:\s*"([^"]+)"/g;
+			let match;
+			while ((match = idRegex.exec(text)) !== null) {
+				if (!ids.includes(match[1])) {
+					ids.push(match[1]);
+				}
+			}
+		}
+		
+	} catch (error) {
+		console.error('Error collecting sibling IDs:', error);
+	}
+	
+	console.log('[collectSiblingIds] Returning IDs:', ids);
+	return ids;
+}
+
 export function activate(context: vscode.ExtensionContext) {
 	console.log('========================================');
 	console.log('SwiftJsonUI Helper v1.6.0 is now active!');
@@ -615,6 +742,37 @@ export function activate(context: vscode.ExtensionContext) {
 							// Return both items - property name only and with value
 							return [item, snippetItem];
 						}).flat();
+					}
+				}
+
+				// Check for alignment attributes that reference other view IDs
+				// Also check for partial input
+				const alignmentRefMatch = linePrefix.match(/"(alignTopOfView|alignBottomOfView|alignLeftOfView|alignRightOfView|alignTopView|alignBottomView|alignLeftView|alignRightView|alignCenterVerticalView|alignCenterHorizontalView)"\s*:\s*"([^"]*)?$/);
+				if (alignmentRefMatch) {
+					console.log('[ID Autocomplete] Alignment attribute detected:', alignmentRefMatch[1]);
+					console.log('[ID Autocomplete] Current partial input:', alignmentRefMatch[2] || '');
+					
+					// Collect IDs from the same hierarchy level
+					const text = document.getText();
+					const currentPos = document.offsetAt(position);
+					const ids = collectSiblingIds(text, currentPos);
+					
+					console.log('[ID Autocomplete] Found sibling IDs:', ids);
+					
+					if (ids.length > 0) {
+						const partialInput = alignmentRefMatch[2] || '';
+						// Filter IDs based on partial input
+						const filteredIds = ids.filter(id => 
+							id.toLowerCase().startsWith(partialInput.toLowerCase())
+						);
+						
+						return filteredIds.map(id => {
+							const item = new vscode.CompletionItem(id, vscode.CompletionItemKind.Reference);
+							item.detail = 'View ID at same hierarchy level';
+							item.insertText = id;
+							item.filterText = id;
+							return item;
+						});
 					}
 				}
 
