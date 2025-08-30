@@ -199,111 +199,141 @@ function collectSiblingIds(text: string, currentPos: number): string[] {
 	console.log('[collectSiblingIds] Starting search from position:', currentPos);
 	
 	try {
-		// Parse the JSON to get a proper structure
-		// First, find the current line and the property we're editing
-		const lines = text.split('\n');
-		let currentLineIndex = 0;
-		let charCount = 0;
+		// More flexible approach: find the nearest "child": [ structure
+		let childArrayStart = -1;
+		let childArrayEnd = -1;
 		
-		for (let i = 0; i < lines.length; i++) {
-			if (charCount + lines[i].length >= currentPos) {
-				currentLineIndex = i;
-				break;
+		// Search backwards for "child" array that contains our position
+		for (let i = currentPos; i >= 0; i--) {
+			if (i >= 7) {
+				const substr = text.substring(i - 7, i);
+				if (substr === '"child"') {
+					// Found "child", now find the array start
+					let j = i;
+					while (j < text.length && text[j] !== '[') {
+						j++;
+						if (j - i > 20) break; // Safety limit
+					}
+					if (text[j] === '[') {
+						// Check if our position is inside this array
+						let depth = 1;
+						let k = j + 1;
+						while (k < text.length && depth > 0) {
+							if (text[k] === '[') depth++;
+							else if (text[k] === ']') depth--;
+							k++;
+						}
+						
+						if (k > currentPos) {
+							// We're inside this child array
+							childArrayStart = j;
+							childArrayEnd = k - 1;
+							console.log('[collectSiblingIds] Found child array:', childArrayStart, '-', childArrayEnd);
+							break;
+						}
+					}
+				}
 			}
-			charCount += lines[i].length + 1; // +1 for newline
 		}
 		
-		console.log('[collectSiblingIds] Current line:', currentLineIndex, lines[currentLineIndex]);
+		if (childArrayStart === -1) {
+			console.log('[collectSiblingIds] No parent child array found');
+			return ids;
+		}
 		
-		// Try to parse the JSON document
-		try {
-			// Try to find where we are in the JSON structure
-			let parentArrayStart = -1;
+		// Extract the array content
+		const arrayContent = text.substring(childArrayStart, childArrayEnd + 1);
+		console.log('[collectSiblingIds] Processing array of length:', arrayContent.length);
+		
+		// Parse the array to find direct child objects only
+		let pos = 0;
+		let depth = 0;
+		let inString = false;
+		let escapeNext = false;
+		
+		while (pos < arrayContent.length) {
+			const char = arrayContent[pos];
 			
-			// Walk backwards from current position to find parent child array
-			for (let i = currentPos - 1; i >= 0; i--) {
-				const char = text[i];
-				
-				// Simple check for "child" property
-				if (i >= 5) {
-					const substr = text.substring(i - 5, i + 1);
-					if (substr === '"child"') {
-						// Look for the array start after this
-						let j = i + 1;
-						while (j < text.length && /\s|:/.test(text[j])) {
-							j++;
+			if (escapeNext) {
+				escapeNext = false;
+				pos++;
+				continue;
+			}
+			
+			if (char === '\\') {
+				escapeNext = true;
+				pos++;
+				continue;
+			}
+			
+			if (char === '"' && !escapeNext) {
+				inString = !inString;
+				pos++;
+				continue;
+			}
+			
+			if (!inString) {
+				if (char === '[') {
+					depth++;
+				} else if (char === ']') {
+					depth--;
+				} else if (char === '{' && depth === 1) {
+					// Found a direct child object at the top level of our array
+					let objStart = pos;
+					let objDepth = 1;
+					let objPos = pos + 1;
+					
+					// Find the end of this object
+					while (objPos < arrayContent.length && objDepth > 0) {
+						const objChar = arrayContent[objPos];
+						
+						if (objChar === '"' && !escapeNext) {
+							inString = !inString;
+						} else if (!inString) {
+							if (objChar === '{') objDepth++;
+							else if (objChar === '}') objDepth--;
 						}
-						if (text[j] === '[') {
-							// Check if current position is inside this array
-							let testDepth = 0;
-							for (let k = j; k < currentPos && k < text.length; k++) {
-								if (text[k] === '[') testDepth++;
-								else if (text[k] === ']') {
-									testDepth--;
-									if (testDepth === 0) {
-										// We're not inside this array
-										break;
-									}
-								}
+						
+						if (objChar === '\\') escapeNext = true;
+						else escapeNext = false;
+						
+						objPos++;
+					}
+					
+					// Extract just this object
+					const objContent = arrayContent.substring(objStart, objPos);
+					
+					// Find only the direct ID of this object (not nested IDs)
+					// Look for the first "id" property that's not inside a nested object/array
+					const lines = objContent.split('\n');
+					for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+						const line = lines[lineIdx];
+						// Check if this line contains an ID property at the root level
+						const idMatch = line.match(/^\s*"id"\s*:\s*"([^"]+)"/);
+						if (idMatch) {
+							// Make sure we're not inside a nested structure
+							// Count braces/brackets before this line
+							const beforeLines = lines.slice(0, lineIdx).join('\n');
+							let nestLevel = 0;
+							for (const ch of beforeLines) {
+								if (ch === '{' || ch === '[') nestLevel++;
+								else if (ch === '}' || ch === ']') nestLevel--;
 							}
-							if (testDepth > 0) {
-								// We're inside this child array
-								parentArrayStart = j;
-								console.log('[collectSiblingIds] Found parent child array at:', parentArrayStart);
-								
-								// Extract all IDs from this child array
-								let arrayEnd = j + 1;
-								let arrayDepth = 1;
-								
-								// Find the end of this array
-								while (arrayEnd < text.length && arrayDepth > 0) {
-									if (text[arrayEnd] === '[') arrayDepth++;
-									else if (text[arrayEnd] === ']') arrayDepth--;
-									arrayEnd++;
-								}
-								
-								const arrayContent = text.substring(j, arrayEnd);
-								console.log('[collectSiblingIds] Array content length:', arrayContent.length);
-								
-								// Extract all "id" values from this array
-								// Use a simple regex to find all id properties
-								const idRegex = /"id"\s*:\s*"([^"]+)"/g;
-								let match;
-								while ((match = idRegex.exec(arrayContent)) !== null) {
-									ids.push(match[1]);
-									console.log('[collectSiblingIds] Found ID:', match[1]);
-								}
-								
-								break;
+							
+							// Only add if at root level of this object (nestLevel === 1 for the object itself)
+							if (nestLevel === 1) {
+								ids.push(idMatch[1]);
+								console.log('[collectSiblingIds] Found sibling ID:', idMatch[1]);
+								break; // Only take the first ID
 							}
 						}
 					}
+					
+					pos = objPos - 1; // Continue after this object
 				}
 			}
 			
-			// If no parent child array found, we might be at root level
-			if (parentArrayStart === -1) {
-				console.log('[collectSiblingIds] No parent child array found, looking at root level');
-				// Just extract all IDs from the document for now
-				const idRegex = /"id"\s*:\s*"([^"]+)"/g;
-				let match;
-				while ((match = idRegex.exec(text)) !== null) {
-					if (!ids.includes(match[1])) {
-						ids.push(match[1]);
-					}
-				}
-			}
-			
-		} catch (parseError) {
-			console.log('[collectSiblingIds] Could not parse JSON, using fallback method');
-			// Fallback: just find all IDs in the document
-			const idRegex = /"id"\s*:\s*"([^"]+)"/g;
-			let match;
-			while ((match = idRegex.exec(text)) !== null) {
-				if (!ids.includes(match[1])) {
-					ids.push(match[1]);
-				}
-			}
+			pos++;
 		}
 		
 	} catch (error) {
@@ -417,8 +447,39 @@ export function activate(context: vscode.ExtensionContext) {
 							.map(prop => {
 								const item = new vscode.CompletionItem(prop, vscode.CompletionItemKind.Property);
 								item.detail = `SwiftJsonUI property`;
-								// Replace the partial text with the full property name
-								item.insertText = prop;
+								
+								// Check if this is an alignment property that references view IDs
+								const alignmentProps = [
+									'alignTopOfView', 'alignBottomOfView', 'alignLeftOfView', 'alignRightOfView',
+									'alignTopView', 'alignBottomView', 'alignLeftView', 'alignRightView',
+									'alignCenterVerticalView', 'alignCenterHorizontalView'
+								];
+								
+								if (alignmentProps.includes(prop)) {
+									// For alignment properties, create a snippet that includes quotes and ID selection
+									const ids = collectSiblingIds(text, currentPos);
+									console.log('[Alignment Property] Processing:', prop, 'Found IDs:', ids);
+									
+									item.kind = vscode.CompletionItemKind.Snippet;
+									item.detail = 'SwiftJsonUI alignment property (inserts ID selection)';
+									
+									// Check if VS Code will auto-close the quote
+									// We need to handle the closing quote that VS Code automatically adds
+									let snippetText = `${prop}": `;
+									if (ids.length > 0) {
+										// Create a choice snippet with available IDs
+										snippetText += `"\${1|${ids.join(',')}|}`;
+									} else {
+										// Just empty quotes with cursor inside
+										snippetText += `"\${1:}`;
+									}
+									
+									item.insertText = new vscode.SnippetString(snippetText);
+								} else {
+									// Regular property - just insert the name
+									item.insertText = prop;
+								}
+								
 								item.range = new vscode.Range(
 									new vscode.Position(position.line, position.character - partialProp.length),
 									position
@@ -507,6 +568,7 @@ export function activate(context: vscode.ExtensionContext) {
 				}
 
 				if (linePrefix.match(/^\s*"$/)) {
+					console.log('[Snippet Processing] Entering property completion block');
 					const text = document.getText();
 					const currentPos = document.offsetAt(position);
 					
@@ -516,6 +578,8 @@ export function activate(context: vscode.ExtensionContext) {
 					if (typeMatch) {
 						const componentType = typeMatch[1];
 						const properties = componentProperties[componentType] || commonAttributes;
+						console.log('[Snippet Processing] Component type:', componentType);
+						console.log('[Snippet Processing] Available properties count:', properties.length);
 						
 						return properties.map(prop => {
 							const item = new vscode.CompletionItem(prop, vscode.CompletionItemKind.Property);
@@ -533,6 +597,28 @@ export function activate(context: vscode.ExtensionContext) {
 							
 							let snippetText = `${prop}": `;
 							switch(prop) {
+								case 'alignTopOfView':
+								case 'alignBottomOfView':
+								case 'alignLeftOfView':
+								case 'alignRightOfView':
+								case 'alignTopView':
+								case 'alignBottomView':
+								case 'alignLeftView':
+								case 'alignRightView':
+								case 'alignCenterVerticalView':
+								case 'alignCenterHorizontalView':
+									// For alignment attributes, create a special snippet that will trigger ID completion
+									console.log('[Alignment Snippet] Processing alignment property:', prop);
+									const ids = collectSiblingIds(text, currentPos);
+									console.log('[Alignment Snippet] Found IDs:', ids);
+									if (ids.length > 0) {
+										// If there are sibling IDs, create a choice snippet
+										snippetText += `"\${1|${ids.join(',')}|}"`;
+									} else {
+										// If no sibling IDs, just empty quotes with cursor inside
+										snippetText += '"\${1:}"';
+									}
+									break;
 								case 'width':
 								case 'height':
 									snippetText += '"matchParent"';
