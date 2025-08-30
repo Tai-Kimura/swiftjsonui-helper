@@ -1,0 +1,147 @@
+{
+  "name": "swiftjsonui-helper",
+  "displayName": "SwiftJsonUI Helper",
+  "description": "VSCode extension for SwiftJsonUI with JSON autocomplete and templates",
+  "version": "1.6.0",
+  "publisher": "swiftjsonui",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Tai-Kimura/SwiftJsonUI"
+  },
+  "keywords": [
+    "swiftjsonui",
+    "json",
+    "ui",
+    "swift",
+    "ios",
+    "android"
+  ],
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.103.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "enabledApiProposals": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "swiftjsonui-helper.insertViewTemplate",
+        "title": "SwiftJsonUI: Insert View Template"
+      },
+      {
+        "command": "swiftjsonui-helper.insertLabelTemplate",
+        "title": "SwiftJsonUI: Insert Label Template"
+      },
+      {
+        "command": "swiftjsonui-helper.insertButtonTemplate",
+        "title": "SwiftJsonUI: Insert Button Template"
+      },
+      {
+        "command": "swiftjsonui-helper.insertTextFieldTemplate",
+        "title": "SwiftJsonUI: Insert TextField Template"
+      },
+      {
+        "command": "swiftjsonui-helper.insertScrollViewTemplate",
+        "title": "SwiftJsonUI: Insert ScrollView Template"
+      },
+      {
+        "command": "swiftjsonui-helper.insertSafeAreaViewTemplate",
+        "title": "SwiftJsonUI: Insert SafeAreaView Template"
+      },
+      {
+        "command": "swiftjsonui-helper.insertSafeAreaScrollViewTemplate",
+        "title": "SwiftJsonUI: Insert SafeAreaView with Scroll Template"
+      },
+      {
+        "command": "swiftjsonui-helper.insertCollectionTemplate",
+        "title": "SwiftJsonUI: Insert Collection Template"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "swiftjsonui-helper.insertViewTemplate",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorTextFocus && resourceExtname == .json"
+      },
+      {
+        "command": "swiftjsonui-helper.insertLabelTemplate",
+        "key": "ctrl+shift+l",
+        "mac": "cmd+shift+l",
+        "when": "editorTextFocus && resourceExtname == .json"
+      },
+      {
+        "command": "swiftjsonui-helper.insertButtonTemplate",
+        "key": "ctrl+shift+b",
+        "mac": "cmd+shift+b",
+        "when": "editorTextFocus && resourceExtname == .json"
+      },
+      {
+        "command": "swiftjsonui-helper.insertScrollViewTemplate",
+        "key": "ctrl+shift+s",
+        "mac": "cmd+shift+s",
+        "when": "editorTextFocus && resourceExtname == .json"
+      },
+      {
+        "command": "swiftjsonui-helper.insertSafeAreaViewTemplate",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a",
+        "when": "editorTextFocus && resourceExtname == .json"
+      },
+      {
+        "command": "swiftjsonui-helper.insertSafeAreaScrollViewTemplate",
+        "key": "ctrl+shift+x",
+        "mac": "cmd+shift+x",
+        "when": "editorTextFocus && resourceExtname == .json"
+      },
+      {
+        "command": "swiftjsonui-helper.insertCollectionTemplate",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c",
+        "when": "editorTextFocus && resourceExtname == .json"
+      }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": "*.swiftjsonui.json",
+        "url": "./schemas/swiftjsonui-schema.json"
+      }
+    ],
+    "languages": [
+      {
+        "id": "swiftjsonui",
+        "aliases": ["SwiftJsonUI", "swiftjsonui"],
+        "extensions": [".swiftjsonui.json"],
+        "configuration": "./language-configuration.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test",
+    "update-proposed-api": "vscode-dts dev"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.103.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "eslint": "^9.32.0",
+    "typescript": "^5.9.2",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "vscode-dts": "^0.3.3"
+  }
+}

@@ -1,0 +1,175 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SwiftJsonUI Schema",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "View", "Label", "Button", "Image", "TextField", "ScrollView",
+        "Collection", "Switch", "Radio", "Check", "Slider", "Progress",
+        "Indicator", "SelectBox", "Segment", "Web", "Blur", "GradientView",
+        "CircleView"
+      ],
+      "description": "The type of UI component"
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the component"
+    },
+    "width": {
+      "oneOf": [
+        { "type": "string", "enum": ["matchParent", "wrapContent"] },
+        { "type": "number" },
+        { "type": "string", "pattern": "^@\\{.*\\}$" }
+      ],
+      "description": "Width of the component"
+    },
+    "height": {
+      "oneOf": [
+        { "type": "string", "enum": ["matchParent", "wrapContent"] },
+        { "type": "number" },
+        { "type": "string", "pattern": "^@\\{.*\\}$" }
+      ],
+      "description": "Height of the component"
+    },
+    "text": {
+      "type": "string",
+      "description": "Text content (supports @{} binding)"
+    },
+    "fontSize": {
+      "oneOf": [
+        { "type": "number" },
+        { "type": "string", "pattern": "^@\\{.*\\}$" }
+      ],
+      "description": "Font size"
+    },
+    "fontColor": {
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}$|^@\\{.*\\}$",
+      "description": "Font color in hex format or binding"
+    },
+    "background": {
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}$|^@\\{.*\\}$",
+      "description": "Background color in hex format or binding"
+    },
+    "textAlign": {
+      "type": "string",
+      "enum": ["Left", "Center", "Right"],
+      "description": "Text alignment"
+    },
+    "onClick": {
+      "type": "string",
+      "description": "Click handler function name"
+    },
+    "cornerRadius": {
+      "oneOf": [
+        { "type": "number" },
+        { "type": "string", "pattern": "^@\\{.*\\}$" }
+      ],
+      "description": "Corner radius for rounded corners"
+    },
+    "paddings": {
+      "oneOf": [
+        { "type": "number" },
+        { "type": "object", "properties": {
+          "top": { "type": "number" },
+          "bottom": { "type": "number" },
+          "left": { "type": "number" },
+          "right": { "type": "number" }
+        }},
+        { "type": "string", "pattern": "^@\\{.*\\}$" }
+      ],
+      "description": "Padding around the component"
+    },
+    "margins": {
+      "oneOf": [
+        { "type": "number" },
+        { "type": "object", "properties": {
+          "top": { "type": "number" },
+          "bottom": { "type": "number" },
+          "left": { "type": "number" },
+          "right": { "type": "number" }
+        }},
+        { "type": "string", "pattern": "^@\\{.*\\}$" }
+      ],
+      "description": "Margin around the component"
+    },
+    "visible": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "type": "string", "pattern": "^@\\{.*\\}$" }
+      ],
+      "description": "Visibility of the component"
+    },
+    "enabled": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "type": "string", "pattern": "^@\\{.*\\}$" }
+      ],
+      "description": "Whether the component is enabled"
+    },
+    "hint": {
+      "type": "string",
+      "description": "Placeholder text for input fields"
+    },
+    "src": {
+      "type": "string",
+      "description": "Image source URL or path"
+    },
+    "value": {
+      "type": "string",
+      "pattern": "^@\\{.*\\}$",
+      "description": "Bound value for input components"
+    },
+    "checked": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "type": "string", "pattern": "^@\\{.*\\}$" }
+      ],
+      "description": "Checked state for checkboxes/switches"
+    },
+    "min": {
+      "type": "number",
+      "description": "Minimum value for sliders"
+    },
+    "max": {
+      "type": "number",
+      "description": "Maximum value for sliders"
+    },
+    "spacing": {
+      "type": "number",
+      "description": "Spacing between child elements"
+    },
+    "alignment": {
+      "type": "string",
+      "enum": ["top", "center", "bottom", "leading", "trailing"],
+      "description": "Alignment of child elements"
+    },
+    "child": {
+      "oneOf": [
+        { "$ref": "#" },
+        { "type": "array", "items": { "$ref": "#" } }
+      ],
+      "description": "Child component(s)"
+    },
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "class": { "type": "string", "enum": ["String", "Number", "Boolean", "Array", "Object"] },
+          "defaultValue": {}
+        },
+        "required": ["name", "class"]
+      },
+      "description": "Data bindings for the component"
+    },
+    "style": {
+      "type": "string",
+      "description": "Style name reference"
+    }
+  }
+}
