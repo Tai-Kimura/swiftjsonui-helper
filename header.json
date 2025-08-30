@@ -1,0 +1,16 @@
+{
+  "type": "View",
+  "id": "header_view",
+  "width": "matchParent",
+  "height": 60,
+  "background": "#007AFF",
+  "child": [
+    {
+      "type": "Label",
+      "text": "Header",
+      "fontSize": 20,
+      "fontColor": "#FFFFFF",
+      "textAlign": "Center"
+    }
+  ]
+}

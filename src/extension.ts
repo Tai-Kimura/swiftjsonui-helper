@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 
 const commonAttributes = [
 	'id', 'type', 'include', 'style', 'propertyName', 'binding', 'binding_id', 'binding_group', 'tag',
@@ -186,6 +188,40 @@ const templates = {
 		"child": []
 	}
 };
+
+/**
+ * Collects JSON file names from the same directory
+ * @param documentUri The URI of the current document
+ * @returns Array of JSON file names without extension
+ */
+function collectJsonFiles(documentUri: vscode.Uri): string[] {
+	const fileNames: string[] = [];
+	
+	try {
+		const dirPath = path.dirname(documentUri.fsPath);
+		console.log('[collectJsonFiles] Looking for JSON files in:', dirPath);
+		
+		const files = fs.readdirSync(dirPath);
+		
+		for (const file of files) {
+			if (file.endsWith('.json') || file.endsWith('.swiftjsonui.json')) {
+				// Remove extension(s)
+				const nameWithoutExt = file.replace(/\.swiftjsonui\.json$|\.json$/, '');
+				// Don't include the current file
+				const currentFileName = path.basename(documentUri.fsPath).replace(/\.swiftjsonui\.json$|\.json$/, '');
+				if (nameWithoutExt !== currentFileName) {
+					fileNames.push(nameWithoutExt);
+					console.log('[collectJsonFiles] Found JSON file:', nameWithoutExt);
+				}
+			}
+		}
+	} catch (error) {
+		console.error('Error collecting JSON files:', error);
+	}
+	
+	console.log('[collectJsonFiles] Returning file names:', fileNames);
+	return fileNames;
+}
 
 /**
  * Collects all sibling IDs from the same hierarchy level
@@ -428,7 +464,8 @@ export function activate(context: vscode.ExtensionContext) {
 				}
 				
 				// Check if we're editing/deleting a property name
-				const propertyEditMatch = linePrefix.match(/^\s*"(\w*)$/);
+				// Also match after { like {"i
+				const propertyEditMatch = linePrefix.match(/(?:^\s*|{\s*)"(\w*)$/);
 				if (propertyEditMatch) {
 					const partialProp = propertyEditMatch[1];
 					const text = document.getText();
@@ -469,6 +506,24 @@ export function activate(context: vscode.ExtensionContext) {
 									if (ids.length > 0) {
 										// Create a choice snippet with available IDs
 										snippetText += `"\${1|${ids.join(',')}|}`;
+									} else {
+										// Just empty quotes with cursor inside
+										snippetText += `"\${1:}`;
+									}
+									
+									item.insertText = new vscode.SnippetString(snippetText);
+								} else if (prop === 'include') {
+									// For include property, create a snippet with JSON file selection
+									const jsonFiles = collectJsonFiles(document.uri);
+									console.log('[Include Property] Processing, found JSON files:', jsonFiles);
+									
+									item.kind = vscode.CompletionItemKind.Snippet;
+									item.detail = 'Include another JSON file';
+									
+									let snippetText = `${prop}": `;
+									if (jsonFiles.length > 0) {
+										// Create a choice snippet with available JSON files
+										snippetText += `"\${1|${jsonFiles.join(',')}|}`;
 									} else {
 										// Just empty quotes with cursor inside
 										snippetText += `"\${1:}`;
@@ -567,7 +622,8 @@ export function activate(context: vscode.ExtensionContext) {
 					}).flat();
 				}
 
-				if (linePrefix.match(/^\s*"$/)) {
+				// Also match after { like {"
+				if (linePrefix.match(/(?:^\s*|{\s*)"$/)) {
 					console.log('[Snippet Processing] Entering property completion block');
 					const text = document.getText();
 					const currentPos = document.offsetAt(position);
@@ -616,6 +672,19 @@ export function activate(context: vscode.ExtensionContext) {
 										snippetText += `"\${1|${ids.join(',')}|}"`;
 									} else {
 										// If no sibling IDs, just empty quotes with cursor inside
+										snippetText += '"\${1:}"';
+									}
+									break;
+								case 'include':
+									// For include property, create a snippet with JSON file selection
+									console.log('[Include Snippet] Processing include property');
+									const jsonFiles = collectJsonFiles(document.uri);
+									console.log('[Include Snippet] Found JSON files:', jsonFiles);
+									if (jsonFiles.length > 0) {
+										// Create a choice snippet with available JSON files
+										snippetText += `"\${1|${jsonFiles.join(',')}|}"`;
+									} else {
+										// Just empty quotes with cursor inside
 										snippetText += '"\${1:}"';
 									}
 									break;

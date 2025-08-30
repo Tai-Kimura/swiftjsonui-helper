@@ -1,0 +1,15 @@
+{
+  "type": "View",
+  "id": "sample_view",
+  "width": "matchParent",
+  "height": "wrapContent",
+  "background": "#F0F0F0",
+  "child": [
+    {
+      "type": "Label",
+      "text": "Sample Component",
+      "fontSize": 16,
+      "fontColor": "#333333"
+    }
+  ]
+}
