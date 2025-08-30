@@ -203,23 +203,23 @@ export function activate(context: vscode.ExtensionContext) {
 		],
 		{
 			provideCompletionItems(document: vscode.TextDocument, position: vscode.Position) {
+				// Show immediate feedback that autocomplete is triggered
+				vscode.window.showInformationMessage(`Autocomplete triggered at line ${position.line + 1}`);
+				
 				console.log('[Autocomplete] Triggered for:', document.fileName);
 				const linePrefix = document.lineAt(position).text.substring(0, position.character);
 				console.log('[Autocomplete] Line prefix:', linePrefix);
 				
-				// PRIORITY 1: Check if we're inside @{} for data binding suggestions - this should have highest priority
+				// PRIORITY 1: Check if we're inside @{} for data binding suggestions
 				const insideBindingMatch = linePrefix.match(/"[^"]*@\{([^}]*)$/);
 				if (insideBindingMatch) {
-					console.log('[Data Binding] Detected @{ pattern, searching for variables...');
 					const partialName = insideBindingMatch[1];
-					console.log('[Data Binding] Partial name typed:', partialName);
 					const text = document.getText();
 					
 					// Find all data names in the current JSON
 					const dataNames: string[] = [];
 					
 					// Look for data arrays and extract names
-					// This regex finds "data": [ ... ] blocks
 					const dataBlockRegex = /"data"\s*:\s*\[([\s\S]*?)\](?=\s*[,}])/g;
 					let dataMatch;
 					
@@ -242,30 +242,23 @@ export function activate(context: vscode.ExtensionContext) {
 					const hasIncludes = includeRegex.test(text);
 					if (hasIncludes) {
 						// For now, just add common variable names from includes
-						// In a real implementation, you'd parse the included file
 						if (!dataNames.includes('data')) dataNames.push('data');
 						if (!dataNames.includes('items')) dataNames.push('items');
 						if (!dataNames.includes('sections')) dataNames.push('sections');
 					}
 					
-					console.log('[Data Binding] Found variables:', dataNames);
-					
 					// Return filtered suggestions based on partial input
 					const filteredNames = dataNames
 						.filter(name => name.toLowerCase().startsWith(partialName.toLowerCase()));
 					
-					console.log('[Data Binding] Filtered variables:', filteredNames);
-					
 					return filteredNames.map(name => {
-							const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Variable);
-							item.detail = 'Data binding variable';
-							
-							// Simply insert the remaining part of the name
-							// VS Code will handle the replacement automatically
-							item.insertText = name.substring(partialName.length);
-							
-							return item;
-						});
+						const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Variable);
+						item.detail = `Data binding variable`;
+						// Simply insert the full name, let VSCode handle the rest
+						item.insertText = name;
+						item.filterText = name;
+						return item;
+					});
 				}
 				
 				// PRIORITY 2: Check if we're typing @ inside a string value for data binding

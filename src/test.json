@@ -40,7 +40,7 @@
             {
               "type": "Label",
               "id": "text_label",
-              "text": "@{}",
+              "text": "@{serName}",
               "fontSize": 18,
               "fontColor": "#000000",
               "textAlign": "Center",
