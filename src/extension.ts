@@ -224,6 +224,157 @@ function collectJsonFiles(documentUri: vscode.Uri): string[] {
 }
 
 /**
+ * Loads the string.json file from Layouts/Resources directory
+ * @param documentUri The URI of the current document
+ * @returns The parsed string.json content or null if not found
+ */
+function loadStringJson(documentUri: vscode.Uri): any | null {
+	try {
+		const filePath = documentUri.fsPath;
+		
+		// Find the Layouts directory
+		let currentDir = path.dirname(filePath);
+		let layoutsDir = null;
+		
+		// Search up the directory tree for Layouts folder
+		while (currentDir && currentDir !== path.dirname(currentDir)) {
+			if (path.basename(currentDir) === 'Layouts') {
+				layoutsDir = currentDir;
+				break;
+			}
+			// Check if Layouts exists as a subdirectory
+			const layoutsPath = path.join(currentDir, 'Layouts');
+			if (fs.existsSync(layoutsPath) && fs.statSync(layoutsPath).isDirectory()) {
+				layoutsDir = layoutsPath;
+				break;
+			}
+			currentDir = path.dirname(currentDir);
+		}
+		
+		if (!layoutsDir) {
+			console.log('[loadStringJson] Layouts directory not found');
+			return null;
+		}
+		
+		const stringJsonPath = path.join(layoutsDir, 'Resources', 'string.json');
+		console.log('[loadStringJson] Looking for string.json at:', stringJsonPath);
+		
+		if (fs.existsSync(stringJsonPath)) {
+			const content = fs.readFileSync(stringJsonPath, 'utf8');
+			return JSON.parse(content);
+		}
+	} catch (error) {
+		console.error('Error loading string.json:', error);
+	}
+	
+	return null;
+}
+
+/**
+ * Loads color files from Layouts/Resources directory
+ * @param documentUri The URI of the current document
+ * @returns Object containing colors from both colors.json and defined_colors.json
+ */
+function loadColorFiles(documentUri: vscode.Uri): { colors: any | null, definedColors: any | null } {
+	const result = { colors: null, definedColors: null };
+	
+	try {
+		const filePath = documentUri.fsPath;
+		
+		// Find the Layouts directory
+		let currentDir = path.dirname(filePath);
+		let layoutsDir = null;
+		
+		// Search up the directory tree for Layouts folder
+		while (currentDir && currentDir !== path.dirname(currentDir)) {
+			if (path.basename(currentDir) === 'Layouts') {
+				layoutsDir = currentDir;
+				break;
+			}
+			// Check if Layouts exists as a subdirectory
+			const layoutsPath = path.join(currentDir, 'Layouts');
+			if (fs.existsSync(layoutsPath) && fs.statSync(layoutsPath).isDirectory()) {
+				layoutsDir = layoutsPath;
+				break;
+			}
+			currentDir = path.dirname(currentDir);
+		}
+		
+		if (!layoutsDir) {
+			console.log('[loadColorFiles] Layouts directory not found');
+			return result;
+		}
+		
+		// Load colors.json
+		const colorsPath = path.join(layoutsDir, 'Resources', 'colors.json');
+		if (fs.existsSync(colorsPath)) {
+			const content = fs.readFileSync(colorsPath, 'utf8');
+			result.colors = JSON.parse(content);
+			console.log('[loadColorFiles] Loaded colors.json');
+		}
+		
+		// Load defined_colors.json
+		const definedColorsPath = path.join(layoutsDir, 'Resources', 'defined_colors.json');
+		if (fs.existsSync(definedColorsPath)) {
+			const content = fs.readFileSync(definedColorsPath, 'utf8');
+			result.definedColors = JSON.parse(content);
+			console.log('[loadColorFiles] Loaded defined_colors.json');
+		}
+	} catch (error) {
+		console.error('Error loading color files:', error);
+	}
+	
+	return result;
+}
+
+/**
+ * Gets the relative path from Layouts directory to determine context
+ * @param documentUri The URI of the current document
+ * @returns The relative path parts (e.g., ['main'] or ['screens', 'home'])
+ */
+function getLayoutContext(documentUri: vscode.Uri): string[] {
+	try {
+		const filePath = documentUri.fsPath;
+		const fileName = path.basename(filePath).replace(/\.swiftjsonui\.json$|\.json$/, '');
+		
+		// Find the Layouts directory
+		let currentDir = path.dirname(filePath);
+		let layoutsDir = null;
+		let relativePath = [];
+		
+		// Build relative path while searching for Layouts
+		while (currentDir && currentDir !== path.dirname(currentDir)) {
+			const dirName = path.basename(currentDir);
+			
+			if (dirName === 'Layouts') {
+				layoutsDir = currentDir;
+				break;
+			}
+			
+			relativePath.unshift(dirName);
+			currentDir = path.dirname(currentDir);
+		}
+		
+		if (layoutsDir) {
+			// Add the file name at the end
+			relativePath.push(fileName);
+			
+			// If file is directly in Layouts, return just the filename
+			if (relativePath.length === 1) {
+				return [fileName];
+			}
+			
+			// Otherwise return the subdirectory path
+			return relativePath;
+		}
+	} catch (error) {
+		console.error('Error getting layout context:', error);
+	}
+	
+	return [];
+}
+
+/**
  * Collects all sibling IDs from the same hierarchy level
  * @param text The full document text
  * @param currentPos The current cursor position in the document
@@ -382,12 +533,12 @@ function collectSiblingIds(text: string, currentPos: number): string[] {
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('========================================');
-	console.log('SwiftJsonUI Helper v1.6.0 is now active!');
+	console.log('SwiftJsonUI Helper v1.7.0 is now active!');
 	console.log('Extension loaded at:', new Date().toLocaleTimeString());
 	console.log('========================================');
 	
 	// Show information message when extension activates
-	vscode.window.showInformationMessage('SwiftJsonUI Helper v1.6.0 is now active!');
+	vscode.window.showInformationMessage('SwiftJsonUI Helper v1.7.0 is now active!');
 
 	const jsonCompletionProvider = vscode.languages.registerCompletionItemProvider(
 		[
@@ -402,6 +553,236 @@ export function activate(context: vscode.ExtensionContext) {
 				console.log('[Autocomplete] Triggered for:', document.fileName);
 				const linePrefix = document.lineAt(position).text.substring(0, position.character);
 				console.log('[Autocomplete] Line prefix:', linePrefix);
+				
+				// Define color-related attributes
+				const colorAttributes = [
+					'fontColor', 'background', 'borderColor', 'tapBackground', 'tint', 'tintColor', 
+					'color', 'highlightColor', 'hintColor', 'hilightColor', 'disabledFontColor', 
+					'disabledBackground', 'normalColor', 'selectedColor', 'selectedFontColor', 
+					'accessoryBackground', 'accessoryTextColor', 'highlightBackground'
+				];
+				
+				// Check if we're typing a value for color attributes
+				const colorMatch = linePrefix.match(new RegExp(`"(${colorAttributes.join('|')})"\\s*:\\s*"([^"@#]*)$`));
+				if (colorMatch) {
+					const attributeName = colorMatch[1];
+					const partialValue = colorMatch[2] || '';
+					
+					console.log('[Color Autocomplete] Attribute:', attributeName, 'Partial:', partialValue);
+					
+					// Load color files
+					const { colors, definedColors } = loadColorFiles(document.uri);
+					const suggestions: vscode.CompletionItem[] = [];
+					
+					// Add suggestions from colors.json
+					if (colors) {
+						for (const key in colors) {
+							if (key.toLowerCase().startsWith(partialValue.toLowerCase())) {
+								const value = colors[key];
+								const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Color);
+								item.detail = `${value} (from colors.json)`;
+								item.insertText = key;
+								item.sortText = `0_${key}`;
+								item.range = new vscode.Range(
+									new vscode.Position(position.line, position.character - partialValue.length),
+									position
+								);
+								suggestions.push(item);
+							}
+						}
+					}
+					
+					// Add suggestions from defined_colors.json
+					if (definedColors) {
+						for (const key in definedColors) {
+							if (key.toLowerCase().startsWith(partialValue.toLowerCase())) {
+								const value = definedColors[key];
+								if (value !== null) {
+									const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Color);
+									item.detail = `${value} (from defined_colors.json)`;
+									item.insertText = key;
+									item.sortText = `1_${key}`;
+									item.range = new vscode.Range(
+										new vscode.Position(position.line, position.character - partialValue.length),
+										position
+									);
+									suggestions.push(item);
+								}
+							}
+						}
+					}
+					
+					if (suggestions.length > 0) {
+						return suggestions;
+					}
+				}
+				
+				// Check if we're typing a value for text/hint/range attributes
+				const textHintRangeMatch = linePrefix.match(/"(text|hint|range)"\s*:\s*"([^"@]*)$/);
+				if (textHintRangeMatch) {
+					const attributeName = textHintRangeMatch[1];
+					const partialValue = textHintRangeMatch[2] || '';
+					
+					console.log('[String Autocomplete] Attribute:', attributeName, 'Partial:', partialValue);
+					
+					// Load string.json
+					const stringJson = loadStringJson(document.uri);
+					if (!stringJson) {
+						console.log('[String Autocomplete] No string.json found');
+						return undefined;
+					}
+					
+					// Get the context path
+					const context = getLayoutContext(document.uri);
+					console.log('[String Autocomplete] Context:', context);
+					
+					const suggestions: vscode.CompletionItem[] = [];
+					
+					// Parse the current partial value to determine where we are in the navigation
+					// Use underscore as separator
+					const parts = partialValue.split('_');
+					const currentPart = parts[parts.length - 1];
+					const completedParts = parts.slice(0, -1);
+					
+					console.log('[String Autocomplete] Parts:', parts, 'Current:', currentPart, 'Completed:', completedParts);
+					
+					// Navigate through the string.json structure
+					let currentObject = stringJson;
+					let isValidPath = true;
+					
+					for (const part of completedParts) {
+						if (currentObject && typeof currentObject === 'object' && part in currentObject) {
+							currentObject = currentObject[part];
+						} else {
+							isValidPath = false;
+							break;
+						}
+					}
+					
+					if (!isValidPath) {
+						return undefined;
+					}
+					
+					// Get suggestions based on current position
+					if (completedParts.length === 0) {
+						// At the beginning or while typing the first part
+						// Show all possible complete paths that match current input
+						const addFlattenedSuggestions = (obj: any, prefix: string = '') => {
+							for (const key in obj) {
+								const value = obj[key];
+								const currentPath = prefix ? `${prefix}_${key}` : key;
+								
+								// Filter by current partial input
+								if (!currentPath.toLowerCase().startsWith(partialValue.toLowerCase())) {
+									continue;
+								}
+								
+								if (typeof value === 'string') {
+									// This is a final value
+									const item = new vscode.CompletionItem(currentPath, vscode.CompletionItemKind.Value);
+									item.detail = `"${value}"`;
+									item.insertText = currentPath;
+									item.sortText = currentPath;
+									item.range = new vscode.Range(
+										new vscode.Position(position.line, position.character - partialValue.length),
+										position
+									);
+									suggestions.push(item);
+								} else if (typeof value === 'object' && !Array.isArray(value)) {
+									// This is a nested object, recurse
+									addFlattenedSuggestions(value, currentPath);
+								}
+							}
+						};
+						
+						// Add all paths from string.json
+						for (const key in stringJson) {
+							const value = stringJson[key];
+							if (typeof value === 'object' && !Array.isArray(value)) {
+								addFlattenedSuggestions(value, key);
+							} else if (typeof value === 'string' && key.toLowerCase().startsWith(partialValue.toLowerCase())) {
+								// Top-level string value
+								const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Value);
+								item.detail = `"${value}"`;
+								item.insertText = key;
+								item.range = new vscode.Range(
+									new vscode.Position(position.line, position.character - partialValue.length),
+									position
+								);
+								suggestions.push(item);
+							}
+						}
+					} else if (completedParts.length > 0 && currentPart === '' && currentObject && typeof currentObject === 'object') {
+						// After any completed part with underscore (e.g., "main_", "screens_", etc.)
+						// Suggest keys from the current object level
+						for (const key in currentObject) {
+							const value = currentObject[key];
+							const item = new vscode.CompletionItem(key, 
+								typeof value === 'object' ? vscode.CompletionItemKind.Module : vscode.CompletionItemKind.Value
+							);
+							
+							if (typeof value === 'string') {
+								item.detail = `"${value}"`;
+							} else if (typeof value === 'object' && !Array.isArray(value)) {
+								item.detail = 'String resource group';
+							}
+							
+							// Build the complete path
+							const fullPath = completedParts.join('_') + '_' + key;
+							
+							if (typeof value === 'object' && !Array.isArray(value)) {
+								item.insertText = fullPath + '_';
+							} else {
+								item.insertText = fullPath;
+							}
+							
+							item.filterText = key;
+							item.range = new vscode.Range(
+								new vscode.Position(position.line, position.character - partialValue.length),
+								position
+							);
+							
+							suggestions.push(item);
+						}
+					} else if (currentObject && typeof currentObject === 'object') {
+						// Suggest keys from current object level
+						for (const key in currentObject) {
+							if (key.toLowerCase().startsWith(currentPart.toLowerCase())) {
+								const value = currentObject[key];
+								const item = new vscode.CompletionItem(key, 
+									typeof value === 'object' ? vscode.CompletionItemKind.Module : vscode.CompletionItemKind.Value
+								);
+								
+								if (typeof value === 'string') {
+									item.detail = `"${value}"`;
+								} else if (typeof value === 'object' && !Array.isArray(value)) {
+									item.detail = 'String resource group';
+								}
+								
+								// Build the complete path
+								const fullPath = completedParts.length > 0 
+									? completedParts.join('_') + '_' + key
+									: key;
+								
+								if (typeof value === 'object' && !Array.isArray(value)) {
+									item.insertText = fullPath + '_';
+								} else {
+									item.insertText = fullPath;
+								}
+								
+								item.filterText = key;
+								item.range = new vscode.Range(
+									new vscode.Position(position.line, position.character - partialValue.length),
+									position
+								);
+								
+								suggestions.push(item);
+							}
+						}
+					}
+					
+					return suggestions;
+				}
 				
 				// PRIORITY 1: Check if we're inside @{} for data binding suggestions
 				const insideBindingMatch = linePrefix.match(/"[^"]*@\{([^}]*)$/);
@@ -1167,7 +1548,8 @@ export function activate(context: vscode.ExtensionContext) {
 		},
 		'"',
 		':',
-		'@'  // Add @ as a trigger character for data binding
+		'@',  // Add @ as a trigger character for data binding
+		'_'   // Add _ as a trigger character for string.json navigation
 	);
 
 	// Add a separate completion provider for { character

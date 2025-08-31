@@ -2,7 +2,7 @@
   "name": "swiftjsonui-helper",
   "displayName": "SwiftJsonUI Helper",
   "description": "VSCode extension for SwiftJsonUI with JSON autocomplete and templates",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "publisher": "swiftjsonui",
   "repository": {
     "type": "git",

@@ -6,3 +6,4 @@ node_modules
 test.json
 src/test.json
 test-*.json
+test_app/
